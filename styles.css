@@ -147,10 +147,12 @@ body {
   align-items: center;
   justify-content: space-between;
   height: var(--header-height);
-  padding: 0 20px;
-  background: var(--bg-sidebar);
-  border-bottom: 1px solid var(--border-color);
+  padding: 0 24px;
+  background: linear-gradient(180deg, var(--bg-sidebar) 0%, rgba(13, 13, 13, 0.95) 100%);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03), 0 4px 12px rgba(0, 0, 0, 0.15);
   flex-shrink: 0;
+  position: relative;
+  z-index: 10;
 }
 
 .header-left {
@@ -275,28 +277,41 @@ body {
   flex: 1;
   overflow: hidden;
   background: var(--bg-app);
+  position: relative;
 }
 
 /* Panels */
 .panel {
   display: flex;
   flex-direction: column;
-  background: var(--bg-app);
   overflow: hidden;
 }
 
+/* Editor - Floating Panel */
 .panel-editor {
-  width: var(--editor-width);
-  min-width: var(--min-panel-width);
-  border-right: 1px solid var(--border-color);
-  background: var(--bg-sidebar);
-  transition: width var(--transition-normal), min-width var(--transition-normal);
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  bottom: 16px;
+  width: 420px;
+  min-width: 320px;
+  max-width: calc(50% - 32px);
+  background: var(--bg-card);
+  border-radius: var(--radius-2xl);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-lg);
+  z-index: 20;
+  transition: all var(--transition-normal);
+  resize: horizontal;
+  overflow: auto;
 }
 
 .panel-editor.collapsed {
   width: 0 !important;
   min-width: 0 !important;
-  border-right: none;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateX(-20px);
 }
 
 .panel-editor.collapsed .panel-header,
@@ -305,9 +320,11 @@ body {
   visibility: hidden;
 }
 
+/* Preview - Main Full-bleed View */
 .panel-preview {
-  flex: 1;
-  min-width: var(--min-panel-width);
+  position: absolute;
+  inset: 0;
+  z-index: 10;
 }
 
 .panel-header {
@@ -315,9 +332,8 @@ body {
   align-items: center;
   justify-content: space-between;
   height: var(--panel-header-height);
-  padding: 0 12px;
-  background: var(--bg-sidebar);
-  border-bottom: 1px solid var(--border-color);
+  padding: 0 16px;
+  background: transparent;
   flex-shrink: 0;
 }
 
@@ -378,34 +394,9 @@ body {
   background: var(--bg-app);
 }
 
-/* Resize Handle */
+/* Resize Handle - Hidden (using CSS resize on editor) */
 .resize-handle {
-  width: 6px;
-  background: var(--bg-sidebar);
-  cursor: col-resize;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background var(--transition-fast);
-  flex-shrink: 0;
-}
-
-.resize-handle:hover,
-.resize-handle.dragging {
-  background: var(--accent);
-}
-
-.resize-handle-bar {
-  width: 2px;
-  height: 32px;
-  background: var(--border-color);
-  border-radius: 2px;
-  transition: background var(--transition-fast);
-}
-
-.resize-handle:hover .resize-handle-bar,
-.resize-handle.dragging .resize-handle-bar {
-  background: transparent;
+  display: none;
 }
 
 .panel-editor.collapsed+.resize-handle {

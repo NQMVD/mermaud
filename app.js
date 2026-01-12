@@ -268,9 +268,13 @@ async function initMonaco() {
         insertSpaces: true,
         padding: { top: 16, bottom: 16 },
         scrollbar: {
-          verticalScrollbarSize: 10,
-          horizontalScrollbarSize: 10,
+          vertical: 'hidden',
+          horizontal: 'hidden',
+          useShadows: false,
         },
+        overviewRulerLanes: 0,
+        hideCursorInOverviewRuler: true,
+        overviewRulerBorder: false,
         suggest: {
           showKeywords: true,
           showSnippets: true,

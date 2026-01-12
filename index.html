@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mermaid Playground</title>
+  <meta name="description" content="A beautiful dark-mode Mermaid diagram editor with live preview and export options">
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  
+  <!-- Monaco Editor -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/editor/editor.main.min.css">
+  
+  <!-- Styles -->
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-left">
+        <h1 class="logo">
+          <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+            <path d="M2 17l10 5 10-5"/>
+            <path d="M2 12l10 5 10-5"/>
+          </svg>
+          Mermaid Playground
+        </h1>
+      </div>
+      <div class="header-right">
+        <div class="export-group">
+          <button class="btn btn-export" id="export-png" title="Export PNG @2x">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="3" width="18" height="18" rx="2"/>
+              <circle cx="8.5" cy="8.5" r="1.5"/>
+              <path d="M21 15l-5-5L5 21"/>
+            </svg>
+            PNG
+          </button>
+          <button class="btn btn-export" id="export-svg" title="Export SVG">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14,2 14,8 20,8"/>
+              <path d="M9 15l2 2 4-4"/>
+            </svg>
+            SVG
+          </button>
+          <button class="btn btn-export" id="export-pdf" title="Export PDF">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14,2 14,8 20,8"/>
+              <line x1="16" y1="13" x2="8" y2="13"/>
+              <line x1="16" y1="17" x2="8" y2="17"/>
+            </svg>
+            PDF
+          </button>
+          <button class="btn btn-export" id="export-code" title="Export Mermaid Code">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="16,18 22,12 16,6"/>
+              <polyline points="8,6 2,12 8,18"/>
+            </svg>
+            Code
+          </button>
+        </div>
+        <div class="header-controls">
+          <button class="btn btn-icon" id="theme-toggle" title="Toggle theme (Ctrl+Shift+L)">
+            <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="5"/>
+              <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+            </svg>
+            <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main">
+      <!-- Editor Panel -->
+      <div class="panel panel-editor" id="editor-panel">
+        <div class="panel-header">
+          <span class="panel-title">Editor</span>
+          <button class="btn btn-icon btn-collapse" id="toggle-editor" title="Toggle editor (Ctrl+\\)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="11,17 6,12 11,7"/>
+              <polyline points="18,17 13,12 18,7"/>
+            </svg>
+          </button>
+        </div>
+        <div class="editor-container" id="editor-container"></div>
+      </div>
+
+      <!-- Resize Handle -->
+      <div class="resize-handle" id="resize-handle">
+        <div class="resize-handle-bar"></div>
+      </div>
+
+      <!-- Preview Panel -->
+      <div class="panel panel-preview" id="preview-panel">
+        <div class="panel-header">
+          <span class="panel-title">Preview</span>
+        </div>
+        <div class="preview-container" id="preview-container">
+          <div class="diagram-wrapper" id="diagram-wrapper">
+            <div id="mermaid-output"></div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <!-- PDF Size Modal -->
+    <div class="modal" id="pdf-modal">
+      <div class="modal-backdrop"></div>
+      <div class="modal-content">
+        <h3>Export PDF</h3>
+        <p>Select page size:</p>
+        <div class="modal-options">
+          <button class="btn btn-modal-option" data-size="a4">A4 (210 × 297 mm)</button>
+          <button class="btn btn-modal-option" data-size="letter">Letter (8.5 × 11 in)</button>
+          <button class="btn btn-modal-option" data-size="a3">A3 (297 × 420 mm)</button>
+        </div>
+        <button class="btn btn-modal-cancel" id="pdf-cancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/loader.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

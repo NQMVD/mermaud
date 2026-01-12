@@ -301,17 +301,15 @@ body {
   border: 1px solid var(--border-color);
   box-shadow: var(--shadow-lg);
   z-index: 20;
-  transition: all var(--transition-normal);
-  resize: horizontal;
-  overflow: auto;
+  transition: transform 300ms cubic-bezier(0.4, 0, 0.2, 1), opacity 300ms ease;
+  overflow: visible;
 }
 
 .panel-editor.collapsed {
-  width: 0 !important;
-  min-width: 0 !important;
   opacity: 0;
-  visibility: hidden;
-  transform: translateX(-20px);
+  transform: translateX(-450px);
+  /* Slide completely off-screen */
+  pointer-events: none;
 }
 
 .panel-editor.collapsed .panel-header,
@@ -394,13 +392,53 @@ body {
   background: var(--bg-app);
 }
 
-/* Resize Handle - Hidden (using CSS resize on editor) */
+/* Resize Handle - Restored pill style on panel edge */
 .resize-handle {
-  display: none;
+  position: absolute;
+  right: -6px;
+  /* Center over the edge */
+  top: 0;
+  bottom: 0;
+  width: 12px;
+  background: transparent;
+  cursor: col-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 300ms cubic-bezier(0.4, 0, 0.2, 1), opacity 300ms ease;
+  z-index: 30;
+  /* Above editor */
 }
 
-.panel-editor.collapsed+.resize-handle {
-  display: none;
+.resize-handle::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 4px;
+  height: 48px;
+  background: var(--border-active);
+  border-radius: 4px;
+  transition: all var(--transition-fast);
+}
+
+.resize-handle:hover::before,
+.resize-handle.dragging::before {
+  background: var(--accent);
+  height: 64px;
+  box-shadow: 0 0 12px var(--accent-glow);
+}
+
+.panel-editor.collapsed .resize-handle {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.editor-container {
+  flex: 1;
+  overflow: hidden;
+  border-radius: 0 0 var(--radius-2xl) var(--radius-2xl);
 }
 
 /* Preview Container */

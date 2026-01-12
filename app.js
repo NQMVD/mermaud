@@ -400,9 +400,11 @@ function handleResize(e) {
   if (!isResizing) return;
 
   const containerRect = elements.editorPanel.parentElement.getBoundingClientRect();
-  const newWidth = e.clientX - containerRect.left;
-  const minWidth = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--min-panel-width'));
-  const maxWidth = containerRect.width - minWidth - 8; // 8px for resize handle
+  const margin = 16; // Margin from left
+  const newWidth = e.clientX - containerRect.left - margin;
+
+  const minWidth = 320;
+  const maxWidth = Math.floor(containerRect.width * 0.5) - margin;
 
   const clampedWidth = Math.max(minWidth, Math.min(maxWidth, newWidth));
   elements.editorPanel.style.width = `${clampedWidth}px`;

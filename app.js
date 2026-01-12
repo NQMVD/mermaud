@@ -24,9 +24,9 @@ const CONFIG = {
     E --> F
     F --> G[🚀 Ship It!]
     
-    style A fill:#44403c,stroke:#ea580c,color:#fafaf9
-    style G fill:#44403c,stroke:#22c55e,color:#fafaf9
-    style B fill:#44403c,stroke:#d6a066,color:#fafaf9`,
+    style A fill:#1a1a1a,stroke:#d97757,color:#f0f0f0
+    style G fill:#1a1a1a,stroke:#22c55e,color:#f0f0f0
+    style B fill:#1a1a1a,stroke:#d97757,color:#f0f0f0`,
 };
 
 // ==========================================
@@ -102,20 +102,20 @@ function initMermaid() {
     startOnLoad: false,
     theme: 'dark',
     securityLevel: 'loose',
-    fontFamily: 'Inter, sans-serif',
+    fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif',
     flowchart: {
       htmlLabels: true,
       curve: 'basis',
     },
     themeVariables: {
       darkMode: true,
-      background: '#44403c',
-      primaryColor: '#ea580c',
-      primaryTextColor: '#fafaf9',
-      primaryBorderColor: '#ea580c',
-      lineColor: '#d6a066',
-      secondaryColor: '#57534e',
-      tertiaryColor: '#78716c',
+      background: '#161616',
+      primaryColor: '#d97757',
+      primaryTextColor: '#f0f0f0',
+      primaryBorderColor: '#d97757',
+      lineColor: '#666666',
+      secondaryColor: '#1a1a1a',
+      tertiaryColor: '#222222',
     },
   });
 }
@@ -174,27 +174,27 @@ async function initMonaco() {
         base: 'vs-dark',
         inherit: true,
         rules: [
-          { token: 'keyword', foreground: 'ea580c', fontStyle: 'bold' },
-          { token: 'identifier', foreground: 'fafaf9' },
+          { token: 'keyword', foreground: 'd97757', fontStyle: 'bold' },
+          { token: 'identifier', foreground: 'f0f0f0' },
           { token: 'string', foreground: '22c55e' },
           { token: 'string.bracket', foreground: '60a5fa' },
           { token: 'string.paren', foreground: 'f472b6' },
           { token: 'string.brace', foreground: 'fbbf24' },
-          { token: 'comment', foreground: 'a8a29e', fontStyle: 'italic' },
-          { token: 'operator', foreground: 'd6a066' },
+          { token: 'comment', foreground: '666666', fontStyle: 'italic' },
+          { token: 'operator', foreground: '999999' },
           { token: 'annotation', foreground: 'a78bfa' },
-          { token: 'number', foreground: 'fb923c' },
-          { token: 'number.hex', foreground: 'fb923c' },
+          { token: 'number', foreground: 'd97757' },
+          { token: 'number.hex', foreground: 'd97757' },
         ],
         colors: {
-          'editor.background': '#1c1917',
-          'editor.foreground': '#fafaf9',
-          'editor.lineHighlightBackground': '#292524',
-          'editor.selectionBackground': '#ea580c40',
-          'editorCursor.foreground': '#ea580c',
-          'editorLineNumber.foreground': '#78716c',
-          'editorLineNumber.activeForeground': '#d6d3d1',
-          'editor.selectionHighlightBackground': '#ea580c20',
+          'editor.background': '#111111',
+          'editor.foreground': '#f0f0f0',
+          'editor.lineHighlightBackground': '#1a1a1a',
+          'editor.selectionBackground': '#d9775740',
+          'editorCursor.foreground': '#d97757',
+          'editorLineNumber.foreground': '#444444',
+          'editorLineNumber.activeForeground': '#888888',
+          'editor.selectionHighlightBackground': '#d9775720',
         },
       });
 
@@ -530,21 +530,21 @@ async function renderDiagram() {
       themeVariables: isLightMode ? {
         darkMode: false,
         background: '#ffffff',
-        primaryColor: '#ea580c',
-        primaryTextColor: '#1c1917',
-        primaryBorderColor: '#ea580c',
-        lineColor: '#b45309',
-        secondaryColor: '#f5f5f4',
-        tertiaryColor: '#e7e5e4',
+        primaryColor: '#c45e3e',
+        primaryTextColor: '#111111',
+        primaryBorderColor: '#c45e3e',
+        lineColor: '#888888',
+        secondaryColor: '#f5f5f5',
+        tertiaryColor: '#eeeeee',
       } : {
         darkMode: true,
-        background: '#44403c',
-        primaryColor: '#ea580c',
-        primaryTextColor: '#fafaf9',
-        primaryBorderColor: '#ea580c',
-        lineColor: '#d6a066',
-        secondaryColor: '#57534e',
-        tertiaryColor: '#78716c',
+        background: '#161616',
+        primaryColor: '#d97757',
+        primaryTextColor: '#f0f0f0',
+        primaryBorderColor: '#d97757',
+        lineColor: '#666666',
+        secondaryColor: '#1a1a1a',
+        tertiaryColor: '#222222',
       },
     });
 

@@ -48,6 +48,13 @@ let isPanning = false;
 let panStartX = 0;
 let panStartY = 0;
 
+// Trackpad detection
+let isTrackpad = false;
+let lastWheelTime = 0;
+let wheelEventCount = 0;
+let pinchStartDistance = 0;
+let isPinching = false;
+
 // ==========================================
 // DOM Elements
 // ==========================================
@@ -261,6 +268,9 @@ async function initMonaco() {
         fontSize: 14,
         fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
         lineNumbers: 'on',
+        lineNumbersMinChars: 3,
+        glyphMargin: false,
+        folding: false,
         renderLineHighlight: 'line',
         scrollBeyondLastLine: false,
         wordWrap: 'on',
@@ -336,6 +346,12 @@ function initEventListeners() {
   document.addEventListener('mousemove', handlePan);
   document.addEventListener('mouseup', stopPan);
   elements.diagramWrapper.addEventListener('wheel', handleWheel, { passive: false });
+
+  // Trackpad pinch gesture support
+  elements.diagramWrapper.addEventListener('pointerdown', handlePointerDown);
+  document.addEventListener('pointermove', handlePointerMove);
+  document.addEventListener('pointerup', handlePointerUp);
+  document.addEventListener('pointercancel', handlePointerUp);
 
   // Keyboard shortcuts
   document.addEventListener('keydown', handleKeyboardShortcuts);
@@ -442,27 +458,128 @@ function stopPan() {
   elements.diagramWrapper.classList.remove('grabbing');
 }
 
-function handleWheel(e) {
-  e.preventDefault();
+// Pointer tracking for trackpad pinch gestures
+let activePointers = new Map();
 
-  // Use scroll delta for smooth, proportional zoom
-  // Smaller delta = smaller zoom change (great for trackpads)
-  const delta = -e.deltaY * CONFIG.WHEEL_ZOOM_SPEED;
-  const newZoom = zoom * (1 + delta);
+function handlePointerDown(e) {
+  activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  isTrackpad = true; // Trackpad/pen/trackpad input detected
+}
 
-  // Zoom towards mouse position
+function handlePointerMove(e) {
+  if (activePointers.size < 2) return;
+
+  const ptr = activePointers.get(e.pointerId);
+  if (!ptr) return;
+
+  const prevX = ptr.x;
+  const prevY = ptr.y;
+  ptr.x = e.clientX;
+  ptr.y = e.clientY;
+
+  // Two-finger gesture - calculate distance change for pinch zoom
+  const pointers = Array.from(activePointers.values());
+  const currentDistance = Math.hypot(
+    pointers[1].x - pointers[0].x,
+    pointers[1].y - pointers[0].y
+  );
+
   const rect = elements.previewContainer.getBoundingClientRect();
   const mouseX = e.clientX - rect.left;
   const mouseY = e.clientY - rect.top;
 
-  const prevZoom = zoom;
-  setZoom(newZoom, false);
+  // Initialize pinch distance if not set
+  if (pinchStartDistance === 0) {
+    pinchStartDistance = currentDistance;
+    return;
+  }
 
-  // Adjust pan to zoom towards mouse
-  const zoomChange = zoom / prevZoom;
-  panX = mouseX - (mouseX - panX) * zoomChange;
-  panY = mouseY - (mouseY - panY) * zoomChange;
-  updateTransform();
+  // Calculate zoom from distance change
+  const scale = currentDistance / pinchStartDistance;
+  if (scale !== 1) {
+    const newZoom = Math.max(CONFIG.MIN_ZOOM, Math.min(CONFIG.MAX_ZOOM, zoom * scale));
+    const zoomChange = newZoom / zoom;
+    zoom = newZoom;
+    elements.zoomLevel.textContent = `${Math.round(zoom * 100)}%`;
+
+    // Zoom towards the center of the two fingers
+    const centerX = (pointers[0].x + pointers[1].x) / 2 - rect.left;
+    const centerY = (pointers[0].y + pointers[1].y) / 2 - rect.top;
+    panX = centerX - (centerX - panX) * scale;
+    panY = centerY - (centerY - panY) * scale;
+    updateTransform();
+
+    pinchStartDistance = currentDistance;
+  }
+}
+
+function handlePointerUp(e) {
+  activePointers.delete(e.pointerId);
+  if (activePointers.size < 2) {
+    pinchStartDistance = 0;
+  }
+}
+
+function handleWheel(e) {
+  e.preventDefault();
+
+  const rect = elements.previewContainer.getBoundingClientRect();
+  const mouseX = e.clientX - rect.left;
+  const mouseY = e.clientY - rect.top;
+
+  // Detect trackpad based on event characteristics
+  // Trackpads send more frequent, smaller delta events
+  const now = Date.now();
+  const timeSinceLastWheel = now - lastWheelTime;
+  lastWheelTime = now;
+
+  // Trackpad detection: rapid succession of small delta events
+  if (timeSinceLastWheel < 50 && Math.abs(e.deltaY) < 20) {
+    wheelEventCount++;
+    if (wheelEventCount > 3) {
+      isTrackpad = true;
+    }
+  } else {
+    wheelEventCount = 0;
+  }
+
+  // Check for pinch gesture (Ctrl + wheel on trackpad = pinch zoom)
+  if (e.ctrlKey && (e.deltaMode === 1 || e.deltaMode === 0)) {
+    // Trackpad pinch zoom: deltaY indicates zoom direction
+    const pinchFactor = 1 - (e.deltaY * 0.01);
+    const newZoom = Math.max(CONFIG.MIN_ZOOM, Math.min(CONFIG.MAX_ZOOM, zoom * pinchFactor));
+    const zoomChange = newZoom / zoom;
+    zoom = newZoom;
+    elements.zoomLevel.textContent = `${Math.round(zoom * 100)}%`;
+
+    // Zoom towards mouse position
+    panX = mouseX - (mouseX - panX) * zoomChange;
+    panY = mouseY - (mouseY - panY) * zoomChange;
+    updateTransform();
+    return;
+  }
+
+  if (isTrackpad) {
+    // Trackpad: 2-finger scroll = pan
+    // On Mac trackpads, shift+scroll is horizontal, no modifier is vertical
+    panX -= e.deltaX * 1.5;
+    panY -= e.deltaY * 1.5;
+    updateTransform();
+  } else {
+    // Mouse wheel: scroll = zoom
+    // Use scroll delta for smooth, proportional zoom
+    const delta = -e.deltaY * CONFIG.WHEEL_ZOOM_SPEED;
+    const newZoom = zoom * (1 + delta);
+
+    const prevZoom = zoom;
+    setZoom(newZoom, false);
+
+    // Adjust pan to zoom towards mouse position
+    const zoomChange = zoom / prevZoom;
+    panX = mouseX - (mouseX - panX) * zoomChange;
+    panY = mouseY - (mouseY - panY) * zoomChange;
+    updateTransform();
+  }
 }
 
 function setZoom(newZoom, updatePan = true) {

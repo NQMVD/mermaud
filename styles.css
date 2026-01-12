@@ -448,6 +448,8 @@ body {
   inset: 0;
   overflow: hidden;
   cursor: grab;
+  touch-action: none;
+  -ms-touch-action: none;
 }
 
 .diagram-wrapper.grabbing {

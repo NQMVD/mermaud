@@ -301,22 +301,17 @@ body {
   border: 1px solid var(--border-color);
   box-shadow: var(--shadow-lg);
   z-index: 20;
-  transition: transform 300ms cubic-bezier(0.4, 0, 0.2, 1), opacity 300ms ease;
+  transition: transform 300ms cubic-bezier(0.4, 0, 0.2, 1);
   overflow: visible;
 }
 
 .panel-editor.collapsed {
-  opacity: 0;
   transform: translateX(-450px);
   /* Slide completely off-screen */
   pointer-events: none;
 }
 
-.panel-editor.collapsed .panel-header,
-.panel-editor.collapsed .editor-container {
-  opacity: 0;
-  visibility: hidden;
-}
+/* Children don't need opacity/visibility changes for pure slide */
 
 /* Preview - Main Full-bleed View */
 .panel-preview {
@@ -381,7 +376,7 @@ body {
 }
 
 /* Show expand button when editor is collapsed */
-.panel-editor.collapsed~.resize-handle+.panel-preview .btn-expand {
+.panel-editor.collapsed~.panel-preview .btn-expand {
   display: inline-flex;
 }
 
@@ -405,7 +400,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: transform 300ms cubic-bezier(0.4, 0, 0.2, 1), opacity 300ms ease;
+  transition: transform 300ms cubic-bezier(0.4, 0, 0.2, 1);
   z-index: 30;
   /* Above editor */
 }
@@ -431,7 +426,6 @@ body {
 }
 
 .panel-editor.collapsed .resize-handle {
-  opacity: 0;
   pointer-events: none;
 }
 

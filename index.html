@@ -89,14 +89,6 @@
     </header>
     <!-- Main Content -->
     <main class="main">
-      <!-- Expand Editor Button (visible when collapsed) -->
-      <button class="btn btn-expand-editor" id="expand-editor" title="Show editor (Ctrl+\)">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polyline points="13,17 18,12 13,7" />
-          <polyline points="6,17 11,12 6,7" />
-        </svg>
-      </button>
-
       <!-- Editor Panel -->
       <div class="panel panel-editor" id="editor-panel">
         <div class="panel-header">
@@ -119,7 +111,15 @@
       <!-- Preview Panel -->
       <div class="panel panel-preview" id="preview-panel">
         <div class="panel-header">
-          <span class="panel-title">Preview</span>
+          <div class="panel-header-left">
+            <button class="btn btn-icon btn-expand" id="expand-editor" title="Show editor (Ctrl+\)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="13,17 18,12 13,7" />
+                <polyline points="6,17 11,12 6,7" />
+              </svg>
+            </button>
+            <span class="panel-title">Preview</span>
+          </div>
         </div>
         <div class="preview-container" id="preview-container">
           <div class="diagram-wrapper" id="diagram-wrapper">

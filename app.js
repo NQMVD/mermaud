@@ -11,9 +11,10 @@ const CONFIG = {
   STORAGE_KEY: 'mermaid-playground-code',
   DEBOUNCE_MS: 200,
   TOAST_DURATION: 5000,
-  MIN_ZOOM: 0.25,
-  MAX_ZOOM: 4,
-  ZOOM_STEP: 0.25,
+  MIN_ZOOM: 0.1,
+  MAX_ZOOM: 5,
+  ZOOM_STEP: 0.1,
+  WHEEL_ZOOM_SPEED: 0.001,  // Much finer control for trackpad/mouse wheel
   DEFAULT_CODE: `flowchart TD
     A[🎨 Start Here] --> B{Choose Your Path}
     B -->|Design| C[Create Mockups]
@@ -379,7 +380,6 @@ function handleKeyboardShortcuts(e) {
 function toggleEditorPanel() {
   editorCollapsed = !editorCollapsed;
   elements.editorPanel.classList.toggle('collapsed', editorCollapsed);
-  elements.expandEditor.classList.toggle('visible', editorCollapsed);
 
   // Center diagram when editor is toggled
   setTimeout(() => centerDiagram(), 300);
@@ -438,7 +438,11 @@ function stopPan() {
 
 function handleWheel(e) {
   e.preventDefault();
-  const delta = e.deltaY > 0 ? -CONFIG.ZOOM_STEP : CONFIG.ZOOM_STEP;
+
+  // Use scroll delta for smooth, proportional zoom
+  // Smaller delta = smaller zoom change (great for trackpads)
+  const delta = -e.deltaY * CONFIG.WHEEL_ZOOM_SPEED;
+  const newZoom = zoom * (1 + delta);
 
   // Zoom towards mouse position
   const rect = elements.previewContainer.getBoundingClientRect();
@@ -446,7 +450,7 @@ function handleWheel(e) {
   const mouseY = e.clientY - rect.top;
 
   const prevZoom = zoom;
-  setZoom(zoom + delta, false);
+  setZoom(newZoom, false);
 
   // Adjust pan to zoom towards mouse
   const zoomChange = zoom / prevZoom;

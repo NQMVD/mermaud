@@ -54,11 +54,11 @@
   --shadow-lg: 0 8px 30px rgba(0, 0, 0, 0.5);
   --shadow-glow: 0 0 25px var(--accent-glow);
 
-  --radius-sm: 4px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
-  --radius-xl: 16px;
-  --radius-2xl: 24px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --radius-2xl: 28px;
 
   --transition-fast: 150ms ease;
   --transition-normal: 250ms ease;
@@ -321,6 +321,12 @@ body {
   flex-shrink: 0;
 }
 
+.panel-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .panel-title {
   font-size: 11px;
   font-weight: 600;
@@ -341,6 +347,28 @@ body {
 
 .btn-collapse svg {
   transition: transform var(--transition-normal);
+}
+
+/* Expand Button - hidden by default, shown when editor is collapsed */
+.btn-expand {
+  width: 28px;
+  height: 28px;
+  color: var(--text-muted);
+  display: none;
+}
+
+.btn-expand:hover {
+  color: var(--accent);
+  background: var(--accent-muted);
+}
+
+.btn-expand svg {
+  transition: transform var(--transition-normal);
+}
+
+/* Show expand button when editor is collapsed */
+.panel-editor.collapsed~.resize-handle+.panel-preview .btn-expand {
+  display: inline-flex;
 }
 
 /* Editor Container */
@@ -405,10 +433,11 @@ body {
 
 #mermaid-output {
   position: absolute;
-  transform-origin: center center;
+  transform-origin: 0 0;
+  /* Top-left since we use translate */
   background: var(--bg-card);
-  padding: 32px;
-  border-radius: var(--radius-xl);
+  padding: 40px;
+  border-radius: var(--radius-2xl);
   border: 1px solid var(--border-color);
   min-width: max-content;
   box-shadow: var(--shadow-lg);
@@ -417,6 +446,34 @@ body {
 #mermaid-output svg {
   max-width: 100%;
   height: auto;
+}
+
+/* Subgraph Styling - Dashed borders, darker background */
+#mermaid-output .cluster rect {
+  fill: var(--bg-elevated) !important;
+  stroke: var(--text-muted) !important;
+  stroke-dasharray: 6 4 !important;
+  stroke-width: 1.5px !important;
+  rx: 12px !important;
+  ry: 12px !important;
+}
+
+#mermaid-output .cluster .nodeLabel,
+#mermaid-output .cluster-label {
+  color: var(--text-tertiary) !important;
+  fill: var(--text-tertiary) !important;
+}
+
+/* Make all diagram shapes rounded */
+#mermaid-output .node rect,
+#mermaid-output .node polygon {
+  rx: 8px !important;
+  ry: 8px !important;
+}
+
+#mermaid-output .edgePath .path {
+  stroke-linecap: round !important;
+  stroke-linejoin: round !important;
 }
 
 /* Toast Notifications */
@@ -638,42 +695,6 @@ body {
 
 #mermaid-output marker path {
   fill: var(--text-muted) !important;
-}
-
-/* Expand Editor Button */
-.btn-expand-editor {
-  position: fixed;
-  left: 16px;
-  top: 50%;
-  transform: translateY(-50%);
-  z-index: 100;
-  width: 40px;
-  height: 40px;
-  padding: 0;
-  background: var(--accent);
-  border: none;
-  border-radius: 50%;
-  color: #000000;
-  box-shadow: var(--shadow-md), var(--shadow-glow);
-  opacity: 0;
-  visibility: hidden;
-  transition: all var(--transition-normal);
-  cursor: pointer;
-}
-
-.btn-expand-editor:hover {
-  transform: translateY(-50%) scale(1.1);
-  background: var(--accent-hover);
-}
-
-.btn-expand-editor.visible {
-  opacity: 1;
-  visibility: visible;
-}
-
-.btn-expand-editor svg {
-  width: 20px;
-  height: 20px;
 }
 
 /* Zoom Controls */

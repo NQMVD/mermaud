@@ -469,8 +469,7 @@ body {
 }
 
 #mermaid-output svg {
-  max-width: 100%;
-  height: auto;
+  display: block;
 }
 
 /* Subgraph Styling - Dashed borders, darker background */

@@ -11,8 +11,8 @@ const CONFIG = {
   STORAGE_KEY: 'mermaid-playground-code',
   DEBOUNCE_MS: 200,
   TOAST_DURATION: 5000,
-  MIN_ZOOM: 0.1,
-  MAX_ZOOM: 5,
+  MIN_ZOOM: 0.05,
+  MAX_ZOOM: 10,
   ZOOM_STEP: 0.1,
   WHEEL_ZOOM_SPEED: 0.001,  // Much finer control for trackpad/mouse wheel
   DEFAULT_CODE: `flowchart TD
@@ -114,7 +114,18 @@ function initMermaid() {
     flowchart: {
       htmlLabels: true,
       curve: 'basis',
+      useMaxWidth: false,
+      fontSize: 16,
+      padding: 15,
     },
+    sequence: { useMaxWidth: false, fontSize: 16, boxMargin: 10 },
+    gantt: { useMaxWidth: false, fontSize: 16 },
+    journey: { useMaxWidth: false, fontSize: 16 },
+    timeline: { useMaxWidth: false, fontSize: 16 },
+    class: { useMaxWidth: false, fontSize: 16 },
+    state: { useMaxWidth: false, fontSize: 16 },
+    er: { useMaxWidth: false, fontSize: 16 },
+    pie: { useMaxWidth: false, fontSize: 16 },
     themeVariables: {
       darkMode: true,
       background: '#161616',
@@ -595,7 +606,34 @@ function updateTransform() {
 }
 
 function resetView() {
-  zoom = 1;
+  fitToView();
+}
+
+function fitToView() {
+  const containerRect = elements.previewContainer.getBoundingClientRect();
+  
+  // Temporarily reset transform to get natural size
+  const prevTransform = elements.mermaidOutput.style.transform;
+  elements.mermaidOutput.style.transform = 'none';
+  const outputRect = elements.mermaidOutput.getBoundingClientRect();
+  elements.mermaidOutput.style.transform = prevTransform;
+
+  if (outputRect.width === 0 || outputRect.height === 0) return;
+
+  const padding = 80;
+  const availableWidth = containerRect.width - padding;
+  const availableHeight = containerRect.height - padding;
+
+  const scaleX = availableWidth / outputRect.width;
+  const scaleY = availableHeight / outputRect.height;
+  
+  // Fit to screen, but don't exceed 1.0 zoom for small diagrams
+  // Unless the user wants it BIGGER, maybe I should allow it to grow?
+  // The user said "make the diagrams render at a bigger scale"
+  // Let's allow it to grow up to 1.5x if it's small, to make it more readable
+  const targetZoom = Math.min(scaleX, scaleY);
+  zoom = Math.min(Math.max(CONFIG.MIN_ZOOM, targetZoom), 1.5);
+  
   centerDiagram();
 }
 
@@ -654,6 +692,15 @@ async function renderDiagram() {
       theme: isLightMode ? 'default' : 'dark',
       securityLevel: 'loose',
       fontFamily: 'Inter, sans-serif',
+      flowchart: { useMaxWidth: false, fontSize: 16, padding: 15 },
+      sequence: { useMaxWidth: false, fontSize: 16, boxMargin: 10 },
+      gantt: { useMaxWidth: false, fontSize: 16 },
+      journey: { useMaxWidth: false, fontSize: 16 },
+      timeline: { useMaxWidth: false, fontSize: 16 },
+      class: { useMaxWidth: false, fontSize: 16 },
+      state: { useMaxWidth: false, fontSize: 16 },
+      er: { useMaxWidth: false, fontSize: 16 },
+      pie: { useMaxWidth: false, fontSize: 16 },
       themeVariables: isLightMode ? {
         darkMode: false,
         background: '#ffffff',
@@ -679,7 +726,14 @@ async function renderDiagram() {
     elements.mermaidOutput.innerHTML = svg;
 
     // Center the diagram after rendering
-    setTimeout(centerDiagram, 50);
+    // If it's the first render or a reset, fit to view
+    setTimeout(() => {
+      if (panX === 0 && panY === 0) {
+        fitToView();
+      } else {
+        centerDiagram();
+      }
+    }, 50);
   } catch (error) {
     showToast('error', 'Syntax Error', error.message || 'Invalid Mermaid syntax');
   }

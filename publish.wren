@@ -15,19 +15,38 @@ class Publisher {
       Process.exit(1)
     }
 
-    // 2. Determine Repo Name
-    var repoName = Args.count() > 0 ? Args.get(0) : Process.cwd().split("/")[-1]
+    // 2. Parse arguments
+    var genReadme = false
+    var repoName = null
+
+    for (arg in Args) {
+      if (arg == "--gen-readme") {
+        genReadme = true
+      } else if (arg.startsWith("-")) {
+        Log.warn("Unknown flag: %(arg)")
+      } else {
+        repoName = arg
+      }
+    }
+
+    if (repoName == null) {
+      repoName = Process.cwd().split("/")[-1]
+    }
+
     var domain = "%(repoName).stardive.live"
 
-    Log.info("Starting parallel deployment", {"project": repoName})
+    Log.info("Starting deployment", {"project": repoName, "genReadme": genReadme})
 
-    // Create the three fibers
-    var readmeFiber = Fiber.new { generateReadme() }
-    var mainFiber = Fiber.new { runDeployment(repoName, domain) }
-    var coordinatorFiber = Fiber.new { coordinate(readmeFiber, mainFiber) }
-
-    // Start the coordinator
-    coordinatorFiber.call()
+    if (genReadme) {
+      // Run with README generation in parallel
+      var readmeFiber = Fiber.new { generateReadme() }
+      var mainFiber = Fiber.new { runDeployment(repoName, domain) }
+      var coordinatorFiber = Fiber.new { coordinate(readmeFiber, mainFiber) }
+      coordinatorFiber.call()
+    } else {
+      // Run deployment only
+      runDeployment(repoName, domain)
+    }
   }
 
   static coordinate(readmeFiber, mainFiber) {

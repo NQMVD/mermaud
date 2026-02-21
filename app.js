@@ -805,6 +805,54 @@ function removeToast(toast) {
 // Export Functions
 // ==========================================
 
+const exportUtils = window.ExportUtils || {
+  resolveExportBackgroundColor: ({
+    cssVariableBackgroundColor = '',
+    containerBackgroundColor = '',
+    bodyBackgroundColor = '',
+    fallbackColor = '#161616',
+  } = {}) => {
+    const candidates = [
+      cssVariableBackgroundColor,
+      containerBackgroundColor,
+      bodyBackgroundColor,
+      fallbackColor,
+    ];
+    for (const candidate of candidates) {
+      const value = String(candidate || '').trim();
+      if (value) return value;
+    }
+    return '#161616';
+  },
+  buildStandaloneSvgMarkup: (svgMarkup, embeddedCss = '') => {
+    const trimmedCss = String(embeddedCss || '').trim();
+    let markup = String(svgMarkup || '');
+    if (!/<svg\b[^>]*\bxmlns=/.test(markup)) {
+      markup = markup.replace(
+        /<svg\b/,
+        '<svg xmlns="http://www.w3.org/2000/svg"'
+      );
+    }
+    if (!trimmedCss) return markup;
+
+    const openingTagEnd = markup.indexOf('>');
+    if (openingTagEnd === -1) return markup;
+    const safeCss = trimmedCss.replace(/<\/style/gi, '<\\/style');
+    return `${markup.slice(0, openingTagEnd + 1)}<style>${safeCss}</style>${markup.slice(openingTagEnd + 1)}`;
+  },
+};
+
+function getExportBackgroundColor() {
+  const bodyStyles = getComputedStyle(document.body);
+  const outputStyles = getComputedStyle(elements.mermaidOutput);
+
+  return exportUtils.resolveExportBackgroundColor({
+    cssVariableBackgroundColor: bodyStyles.getPropertyValue('--bg-card'),
+    containerBackgroundColor: outputStyles.backgroundColor,
+    bodyBackgroundColor: bodyStyles.backgroundColor,
+  });
+}
+
 async function exportPng() {
   const svg = elements.mermaidOutput.querySelector('svg');
   if (!svg) {
@@ -813,10 +861,12 @@ async function exportPng() {
   }
 
   try {
+    const backgroundColor = getExportBackgroundColor();
+
     // Create a canvas with 2x scale for retina
     const canvas = await html2canvas(elements.mermaidOutput, {
       scale: 2,
-      backgroundColor: getComputedStyle(document.body).getPropertyValue('--bg-tertiary').trim(),
+      backgroundColor,
       logging: false,
     });
 
@@ -840,19 +890,11 @@ function exportSvg() {
   }
 
   try {
-    // Clone and clean up SVG
-    const svgClone = svg.cloneNode(true);
-    svgClone.removeAttribute('id');
-    svgClone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
-
-    // Add embedded styles for standalone SVG
-    const styleElement = document.createElementNS('http://www.w3.org/2000/svg', 'style');
-    styleElement.textContent = `
-      text { font-family: Inter, -apple-system, BlinkMacSystemFont, sans-serif; }
-    `;
-    svgClone.insertBefore(styleElement, svgClone.firstChild);
-
-    const svgData = new XMLSerializer().serializeToString(svgClone);
+    const svgMarkup = new XMLSerializer().serializeToString(svg);
+    const svgData = exportUtils.buildStandaloneSvgMarkup(
+      svgMarkup,
+      'text { font-family: Inter, -apple-system, BlinkMacSystemFont, sans-serif; }'
+    );
     const blob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
 
     const link = document.createElement('a');
@@ -884,6 +926,7 @@ async function exportPdf(pageSize = 'a4') {
 
   try {
     const { jsPDF } = window.jspdf;
+    const backgroundColor = getExportBackgroundColor();
 
     // Page dimensions
     const sizes = {
@@ -902,7 +945,7 @@ async function exportPdf(pageSize = 'a4') {
     // Convert SVG to image
     const canvas = await html2canvas(elements.mermaidOutput, {
       scale: 2,
-      backgroundColor: getComputedStyle(document.body).getPropertyValue('--bg-tertiary').trim(),
+      backgroundColor,
       logging: false,
     });
 

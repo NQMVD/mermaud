@@ -207,6 +207,74 @@ body {
   border-left: 1px solid var(--border-color);
 }
 
+.renderer-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  background: var(--bg-elevated);
+}
+
+.renderer-option {
+  border: none;
+  background: transparent;
+  color: var(--text-tertiary);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 1;
+  border-radius: 8px;
+  padding: 6px 9px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.renderer-option:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+.renderer-option.active {
+  color: #000000;
+  background: var(--accent);
+}
+
+.beautiful-theme-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  background: var(--bg-elevated);
+  color: var(--text-tertiary);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.beautiful-theme-control span {
+  color: var(--text-muted);
+}
+
+.beautiful-theme-control select {
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 6px 2px;
+  outline: none;
+  min-width: 130px;
+  cursor: pointer;
+}
+
+.beautiful-theme-control.disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
 /* Buttons */
 .btn {
   display: inline-flex;
@@ -473,7 +541,7 @@ body {
 }
 
 /* Subgraph Styling - Dashed borders, darker background */
-#mermaid-output .cluster rect {
+#mermaid-output.mode-mermaid .cluster rect {
   fill: var(--bg-elevated) !important;
   stroke: var(--text-muted) !important;
   stroke-dasharray: 6 4 !important;
@@ -482,20 +550,20 @@ body {
   ry: 12px !important;
 }
 
-#mermaid-output .cluster .nodeLabel,
-#mermaid-output .cluster-label {
+#mermaid-output.mode-mermaid .cluster .nodeLabel,
+#mermaid-output.mode-mermaid .cluster-label {
   color: var(--text-tertiary) !important;
   fill: var(--text-tertiary) !important;
 }
 
 /* Make all diagram shapes rounded */
-#mermaid-output .node rect,
-#mermaid-output .node polygon {
+#mermaid-output.mode-mermaid .node rect,
+#mermaid-output.mode-mermaid .node polygon {
   rx: 8px !important;
   ry: 8px !important;
 }
 
-#mermaid-output .edgePath .path {
+#mermaid-output.mode-mermaid .edgePath .path {
   stroke-linecap: round !important;
   stroke-linejoin: round !important;
 }
@@ -669,6 +737,47 @@ body {
   margin-bottom: 20px;
 }
 
+.modal-content-ascii {
+  width: min(760px, 92vw);
+}
+
+.ascii-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.ascii-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.ascii-preview {
+  min-height: 280px;
+  max-height: 52vh;
+  overflow: auto;
+  margin-bottom: 14px;
+  padding: 14px;
+  border-radius: var(--radius-lg);
+  background: var(--bg-app);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  font-size: 12px;
+  line-height: 1.4;
+  font-family: var(--font-mono);
+  white-space: pre;
+}
+
+.ascii-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
 .modal-options {
   display: flex;
   flex-direction: column;
@@ -693,31 +802,31 @@ body {
 }
 
 /* Mermaid Diagram Styles */
-#mermaid-output .node rect,
-#mermaid-output .node circle,
-#mermaid-output .node ellipse,
-#mermaid-output .node polygon,
-#mermaid-output .node path {
+#mermaid-output.mode-mermaid .node rect,
+#mermaid-output.mode-mermaid .node circle,
+#mermaid-output.mode-mermaid .node ellipse,
+#mermaid-output.mode-mermaid .node polygon,
+#mermaid-output.mode-mermaid .node path {
   fill: var(--bg-elevated) !important;
   stroke: var(--accent) !important;
 }
 
-#mermaid-output .nodeLabel,
-#mermaid-output .label {
+#mermaid-output.mode-mermaid .nodeLabel,
+#mermaid-output.mode-mermaid .label {
   color: var(--text-primary) !important;
   fill: var(--text-primary) !important;
 }
 
-#mermaid-output .edgePath .path {
+#mermaid-output.mode-mermaid .edgePath .path {
   stroke: var(--text-muted) !important;
 }
 
-#mermaid-output .edgeLabel {
+#mermaid-output.mode-mermaid .edgeLabel {
   background-color: var(--bg-card) !important;
   color: var(--text-tertiary) !important;
 }
 
-#mermaid-output marker path {
+#mermaid-output.mode-mermaid marker path {
   fill: var(--text-muted) !important;
 }
 
@@ -798,6 +907,23 @@ body {
   .header-controls {
     padding-left: 8px;
     margin-left: 8px;
+  }
+
+  .renderer-option {
+    font-size: 10px;
+    padding: 6px 7px;
+  }
+
+  .beautiful-theme-control {
+    display: none;
+  }
+
+  .ascii-controls {
+    flex-wrap: wrap;
+  }
+
+  .ascii-actions {
+    flex-direction: column;
   }
 
   :root {

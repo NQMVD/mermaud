@@ -128,8 +128,53 @@
                             </svg>
                             Code
                         </button>
+                        <button
+                            class="btn btn-export"
+                            id="export-ascii"
+                            title="Preview and export ASCII"
+                        >
+                            <svg
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                            >
+                                <path d="M4 19l8-14 8 14" />
+                                <line x1="8" y1="13" x2="16" y2="13" />
+                                <line x1="6.5" y1="16" x2="17.5" y2="16" />
+                            </svg>
+                            ASCII
+                        </button>
                     </div>
                     <div class="header-controls">
+                        <div
+                            class="renderer-toggle"
+                            id="renderer-toggle"
+                            role="group"
+                            aria-label="Diagram renderer"
+                        >
+                            <button
+                                class="renderer-option"
+                                data-renderer="mermaid"
+                                title="Use Mermaid's native renderer"
+                            >
+                                Mermaid
+                            </button>
+                            <button
+                                class="renderer-option"
+                                data-renderer="beautiful"
+                                title="Use beautiful-mermaid renderer"
+                            >
+                                Beautiful
+                            </button>
+                        </div>
+                        <label
+                            class="beautiful-theme-control"
+                            for="beautiful-theme-select"
+                        >
+                            <span>Theme</span>
+                            <select id="beautiful-theme-select"></select>
+                        </label>
                         <button
                             class="btn btn-icon"
                             id="theme-toggle"
@@ -310,16 +355,65 @@
                     </button>
                 </div>
             </div>
+
+            <div class="modal" id="ascii-modal">
+                <div class="modal-backdrop"></div>
+                <div class="modal-content modal-content-ascii">
+                    <h3>ASCII Export</h3>
+                    <p>
+                        Preview Beautiful Mermaid terminal output and export as
+                        plain text.
+                    </p>
+                    <div class="ascii-controls">
+                        <label class="ascii-option">
+                            <input
+                                type="radio"
+                                name="ascii-mode"
+                                id="ascii-mode-unicode"
+                                value="unicode"
+                                checked
+                            />
+                            Unicode
+                        </label>
+                        <label class="ascii-option">
+                            <input
+                                type="radio"
+                                name="ascii-mode"
+                                id="ascii-mode-ascii"
+                                value="ascii"
+                            />
+                            ASCII
+                        </label>
+                        <button class="btn" id="ascii-refresh">Refresh</button>
+                    </div>
+                    <pre class="ascii-preview" id="ascii-preview"></pre>
+                    <div class="ascii-actions">
+                        <button class="btn btn-modal-option" id="ascii-copy">
+                            Copy
+                        </button>
+                        <button
+                            class="btn btn-modal-option"
+                            id="ascii-download"
+                        >
+                            Download .txt
+                        </button>
+                    </div>
+                    <button class="btn btn-modal-cancel" id="ascii-cancel">
+                        Close
+                    </button>
+                </div>
+            </div>
         </div>
 
         <!-- Scripts: Load non-AMD libraries FIRST before Monaco's AMD loader -->
-        <!-- Mermaid, html2canvas, jsPDF must load before Monaco to prevent AMD interception -->
+        <!-- Mermaid/Beautiful Mermaid/jsPDF must load before Monaco to prevent AMD interception -->
         <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+        <script src="https://unpkg.com/beautiful-mermaid/dist/beautiful-mermaid.browser.global.js"></script>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
         <!-- Monaco Editor AMD loader loads last -->
         <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/loader.min.js"></script>
         <script src="export-utils.js"></script>
+        <script src="renderer-utils.js"></script>
         <script src="app.js"></script>
     </body>
 </html>

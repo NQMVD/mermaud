@@ -9,6 +9,8 @@
 
 const CONFIG = {
   STORAGE_KEY: 'mermaid-playground-code',
+  RENDERER_STORAGE_KEY: 'mermaid-playground-renderer',
+  BEAUTIFUL_THEME_STORAGE_KEY: 'mermaid-playground-beautiful-theme',
   DEBOUNCE_MS: 200,
   TOAST_DURATION: 5000,
   MIN_ZOOM: 0.05,
@@ -16,6 +18,15 @@ const CONFIG = {
   ZOOM_STEP: 0.1,
   WHEEL_ZOOM_SPEED: 0.001,  // Much finer control for trackpad/mouse wheel
   DEFAULT_CODE: `flowchart TD
+    A[🎨 Start Here] --> B{Choose Your Path}
+    B -->|Design| C[Create Mockups]
+    B -->|Develop| D[Write Code]
+    B -->|Document| E[Draft Specs]
+    C --> F[Review & Iterate]
+    D --> F
+    E --> F
+    F --> G[🚀 Ship It!]`,
+  LEGACY_DEFAULT_CODE: `flowchart TD
     A[🎨 Start Here] --> B{Choose Your Path}
     B -->|Design| C[Create Mockups]
     B -->|Develop| D[Write Code]
@@ -39,6 +50,9 @@ let currentCode = '';
 let renderTimeout = null;
 let isResizing = false;
 let editorCollapsed = false;
+let currentRenderer = 'mermaid';
+let currentBeautifulTheme = '__auto_zinc';
+let latestAscii = '';
 
 // Pan/Zoom state
 let zoom = 1;
@@ -70,13 +84,24 @@ const elements = {
   toggleEditor: document.getElementById('toggle-editor'),
   expandEditor: document.getElementById('expand-editor'),
   themeToggle: document.getElementById('theme-toggle'),
+  rendererToggle: document.getElementById('renderer-toggle'),
+  beautifulThemeSelect: document.getElementById('beautiful-theme-select'),
   toastContainer: document.getElementById('toast-container'),
   pdfModal: document.getElementById('pdf-modal'),
   pdfCancel: document.getElementById('pdf-cancel'),
+  asciiModal: document.getElementById('ascii-modal'),
+  asciiCancel: document.getElementById('ascii-cancel'),
+  asciiRefresh: document.getElementById('ascii-refresh'),
+  asciiCopy: document.getElementById('ascii-copy'),
+  asciiDownload: document.getElementById('ascii-download'),
+  asciiPreview: document.getElementById('ascii-preview'),
+  asciiModeUnicode: document.getElementById('ascii-mode-unicode'),
+  asciiModeAscii: document.getElementById('ascii-mode-ascii'),
   exportPng: document.getElementById('export-png'),
   exportSvg: document.getElementById('export-svg'),
   exportPdf: document.getElementById('export-pdf'),
   exportCode: document.getElementById('export-code'),
+  exportAscii: document.getElementById('export-ascii'),
   zoomIn: document.getElementById('zoom-in'),
   zoomOut: document.getElementById('zoom-out'),
   zoomReset: document.getElementById('zoom-reset'),
@@ -89,6 +114,8 @@ const elements = {
 
 async function init() {
   initTheme();
+  initRenderer();
+  initBeautifulTheme();
   initMermaid();
   await initMonaco();
   initEventListeners();
@@ -103,6 +130,252 @@ function initTheme() {
   if (savedTheme === 'light' || (!savedTheme && !prefersDark)) {
     document.body.classList.add('light-mode');
   }
+}
+
+const rendererUtils = window.RendererUtils || {
+  RENDERERS: {
+    MERMAID: 'mermaid',
+    BEAUTIFUL: 'beautiful',
+  },
+  DEFAULT_BEAUTIFUL_THEME: 'zinc-dark',
+  AUTO_ZINC_THEME_KEY: '__auto_zinc',
+  CUSTOM_THEME_KEY: '__app',
+  normalizeRenderer: (renderer, fallback = 'mermaid') => {
+    const value = String(renderer || '').trim().toLowerCase();
+    if (value === 'beautiful') return 'beautiful';
+    if (value === 'mermaid') return 'mermaid';
+    return fallback;
+  },
+  normalizeBeautifulThemeKey: (
+    themeKey,
+    availableThemeKeys = [],
+    fallback = 'zinc-dark'
+  ) => {
+    const key = String(themeKey || '').trim();
+    if (key === '__auto_zinc') return '__auto_zinc';
+    if (key === '__app') return '__app';
+    if (availableThemeKeys.includes(key)) return key;
+    if (availableThemeKeys.includes(fallback)) return fallback;
+    return availableThemeKeys[0] || fallback;
+  },
+  resolveAutoZincThemeKey: (themeKeys = [], preferLight = false) => {
+    const normalized = themeKeys.map((key) => ({
+      key,
+      normalized: String(key || '').trim().toLowerCase(),
+    }));
+    const zincThemes = normalized.filter((entry) =>
+      entry.normalized.includes('zinc')
+    );
+    if (!zincThemes.length) return '';
+
+    const exactCandidates = preferLight
+      ? ['zinc-light', 'zinc_light', 'zinclight', 'light-zinc', 'light_zinc']
+      : ['zinc-dark', 'zinc_dark', 'zincdark', 'dark-zinc', 'dark_zinc'];
+
+    const exact = zincThemes.find((entry) =>
+      exactCandidates.includes(entry.normalized)
+    );
+    if (exact) return exact.key;
+
+    const toneKeywords = preferLight
+      ? ['light', 'day', 'sun']
+      : ['dark', 'night', 'moon'];
+    const toneMatch = zincThemes.find((entry) =>
+      toneKeywords.some((keyword) => entry.normalized.includes(keyword))
+    );
+    if (toneMatch) return toneMatch.key;
+
+    const base = zincThemes.find((entry) => entry.normalized === 'zinc');
+    if (base) return base.key;
+
+    return zincThemes[0].key;
+  },
+  toThemeLabel: (themeKey) =>
+    String(themeKey || '')
+      .split('-')
+      .filter(Boolean)
+      .map((part) => part[0].toUpperCase() + part.slice(1))
+      .join(' '),
+  buildBeautifulTheme: ({
+    bg = '',
+    fg = '',
+    line = '',
+    accent = '',
+    muted = '',
+    surface = '',
+    border = '',
+  } = {}) => ({
+    bg: String(bg || '').trim() || '#161616',
+    fg: String(fg || '').trim() || '#f0f0f0',
+    line: String(line || '').trim() || '#666666',
+    accent: String(accent || '').trim() || '#d97757',
+    muted: String(muted || '').trim() || '#999999',
+    surface: String(surface || '').trim() || '#1a1a1a',
+    border: String(border || '').trim() || '#2a2a2a',
+  }),
+};
+
+function getBeautifulMermaidApi() {
+  return window.beautifulMermaid;
+}
+
+function getAvailableBeautifulThemes() {
+  const api = getBeautifulMermaidApi();
+  if (!api || !api.THEMES || typeof api.THEMES !== 'object') {
+    return [];
+  }
+  return Object.keys(api.THEMES);
+}
+
+function initRenderer() {
+  const savedRenderer = localStorage.getItem(CONFIG.RENDERER_STORAGE_KEY);
+  currentRenderer = rendererUtils.normalizeRenderer(
+    savedRenderer,
+    rendererUtils.RENDERERS.MERMAID
+  );
+  updateRendererToggleUi();
+  setRenderSurfaceMode(currentRenderer);
+}
+
+function initBeautifulTheme() {
+  populateBeautifulThemeSelect();
+  const savedTheme = localStorage.getItem(CONFIG.BEAUTIFUL_THEME_STORAGE_KEY);
+  const themeKeys = [
+    rendererUtils.AUTO_ZINC_THEME_KEY,
+    rendererUtils.CUSTOM_THEME_KEY,
+    ...getAvailableBeautifulThemes(),
+  ];
+  currentBeautifulTheme = rendererUtils.normalizeBeautifulThemeKey(
+    savedTheme,
+    themeKeys,
+    rendererUtils.AUTO_ZINC_THEME_KEY
+  );
+  if (elements.beautifulThemeSelect) {
+    elements.beautifulThemeSelect.value = currentBeautifulTheme;
+  }
+  updateBeautifulThemeControlUi();
+}
+
+function populateBeautifulThemeSelect() {
+  if (!elements.beautifulThemeSelect) return;
+
+  const themeKeys = getAvailableBeautifulThemes();
+  const options = [
+    {
+      value: rendererUtils.AUTO_ZINC_THEME_KEY,
+      label: 'Auto Zinc',
+    },
+    {
+      value: rendererUtils.CUSTOM_THEME_KEY,
+      label: 'App Adaptive',
+    },
+    ...themeKeys.map((key) => ({
+      value: key,
+      label: rendererUtils.toThemeLabel(key),
+    })),
+  ];
+
+  elements.beautifulThemeSelect.innerHTML = options
+    .map((option) => `<option value="${option.value}">${option.label}</option>`)
+    .join('');
+}
+
+function setBeautifulTheme(nextTheme, persist = true) {
+  const themeKeys = [
+    rendererUtils.AUTO_ZINC_THEME_KEY,
+    rendererUtils.CUSTOM_THEME_KEY,
+    ...getAvailableBeautifulThemes(),
+  ];
+  const normalized = rendererUtils.normalizeBeautifulThemeKey(
+    nextTheme,
+    themeKeys,
+    rendererUtils.AUTO_ZINC_THEME_KEY
+  );
+  if (normalized === currentBeautifulTheme) return;
+  currentBeautifulTheme = normalized;
+  if (elements.beautifulThemeSelect) {
+    elements.beautifulThemeSelect.value = currentBeautifulTheme;
+  }
+  if (persist) {
+    localStorage.setItem(
+      CONFIG.BEAUTIFUL_THEME_STORAGE_KEY,
+      currentBeautifulTheme
+    );
+  }
+  if (currentRenderer === rendererUtils.RENDERERS.BEAUTIFUL) {
+    renderDiagram();
+  }
+}
+
+function setRenderer(nextRenderer, persist = true) {
+  const normalized = rendererUtils.normalizeRenderer(
+    nextRenderer,
+    rendererUtils.RENDERERS.MERMAID
+  );
+  if (normalized === currentRenderer) return;
+
+  if (
+    normalized === rendererUtils.RENDERERS.BEAUTIFUL &&
+    !isBeautifulMermaidAvailable()
+  ) {
+    showToast(
+      'error',
+      'Beautiful Mermaid Missing',
+      'Could not load beautiful-mermaid from CDN.'
+    );
+    return;
+  }
+
+  currentRenderer = normalized;
+  if (persist) {
+    localStorage.setItem(CONFIG.RENDERER_STORAGE_KEY, currentRenderer);
+  }
+  updateRendererToggleUi();
+  updateBeautifulThemeControlUi();
+  setRenderSurfaceMode(currentRenderer);
+  renderDiagram();
+}
+
+function updateRendererToggleUi() {
+  if (!elements.rendererToggle) return;
+  elements.rendererToggle
+    .querySelectorAll('[data-renderer]')
+    .forEach((button) => {
+      const isActive = button.dataset.renderer === currentRenderer;
+      button.classList.toggle('active', isActive);
+      button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+    });
+}
+
+function setRenderSurfaceMode(renderer) {
+  if (!elements.mermaidOutput) return;
+  elements.mermaidOutput.classList.remove('mode-mermaid', 'mode-beautiful');
+  const normalized = rendererUtils.normalizeRenderer(
+    renderer,
+    rendererUtils.RENDERERS.MERMAID
+  );
+  const className = normalized === rendererUtils.RENDERERS.BEAUTIFUL
+    ? 'mode-beautiful'
+    : 'mode-mermaid';
+  elements.mermaidOutput.classList.add(className);
+}
+
+function updateBeautifulThemeControlUi() {
+  const control = elements.beautifulThemeSelect?.closest('.beautiful-theme-control');
+  if (!control || !elements.beautifulThemeSelect) return;
+
+  const isActive = currentRenderer === rendererUtils.RENDERERS.BEAUTIFUL;
+  control.classList.toggle('disabled', !isActive);
+  elements.beautifulThemeSelect.disabled = !isActive;
+}
+
+function isBeautifulMermaidAvailable() {
+  const api = getBeautifulMermaidApi();
+  return Boolean(
+    api &&
+      typeof api.renderMermaid === 'function' &&
+      typeof api.renderMermaidAscii === 'function'
+  );
 }
 
 function initMermaid() {
@@ -326,6 +599,14 @@ function initEventListeners() {
   // Theme toggle
   elements.themeToggle.addEventListener('click', toggleTheme);
 
+  // Renderer toggle
+  elements.rendererToggle.querySelectorAll('[data-renderer]').forEach((button) => {
+    button.addEventListener('click', () => setRenderer(button.dataset.renderer));
+  });
+  elements.beautifulThemeSelect.addEventListener('change', () => {
+    setBeautifulTheme(elements.beautifulThemeSelect.value);
+  });
+
   // Resize handle
   elements.resizeHandle.addEventListener('mousedown', startResize);
   document.addEventListener('mousemove', handleResize);
@@ -336,6 +617,7 @@ function initEventListeners() {
   elements.exportSvg.addEventListener('click', exportSvg);
   elements.exportPdf.addEventListener('click', showPdfModal);
   elements.exportCode.addEventListener('click', exportCode);
+  elements.exportAscii.addEventListener('click', showAsciiModal);
 
   // PDF modal
   elements.pdfCancel.addEventListener('click', hidePdfModal);
@@ -345,6 +627,16 @@ function initEventListeners() {
       exportPdf(btn.dataset.size);
       hidePdfModal();
     });
+  });
+
+  // ASCII modal
+  elements.asciiCancel.addEventListener('click', hideAsciiModal);
+  elements.asciiModal.querySelector('.modal-backdrop').addEventListener('click', hideAsciiModal);
+  elements.asciiRefresh.addEventListener('click', refreshAsciiPreview);
+  elements.asciiCopy.addEventListener('click', copyAsciiPreview);
+  elements.asciiDownload.addEventListener('click', downloadAsciiPreview);
+  [elements.asciiModeUnicode, elements.asciiModeAscii].forEach((input) => {
+    input.addEventListener('change', refreshAsciiPreview);
   });
 
   // Zoom controls
@@ -388,9 +680,14 @@ function handleKeyboardShortcuts(e) {
     e.preventDefault();
     toggleTheme();
   }
-  // Escape to close modal
-  if (e.key === 'Escape' && elements.pdfModal.classList.contains('active')) {
-    hidePdfModal();
+  // Escape to close modals
+  if (e.key === 'Escape') {
+    if (elements.pdfModal.classList.contains('active')) {
+      hidePdfModal();
+    }
+    if (elements.asciiModal.classList.contains('active')) {
+      hideAsciiModal();
+    }
   }
   // Zoom shortcuts
   if (e.key === '+' || e.key === '=') {
@@ -671,6 +968,202 @@ function updateEditorTheme() {
 // Mermaid Rendering
 // ==========================================
 
+function getCssVariable(name, fallback = '') {
+  const value = getComputedStyle(document.body).getPropertyValue(name).trim();
+  return value || fallback;
+}
+
+function getBeautifulThemeOptions() {
+  const api = getBeautifulMermaidApi();
+  const themes = api?.THEMES || {};
+
+  if (currentBeautifulTheme === rendererUtils.CUSTOM_THEME_KEY) {
+    return rendererUtils.buildBeautifulTheme({
+      bg: getCssVariable('--bg-card', '#161616'),
+      fg: getCssVariable('--text-primary', '#f0f0f0'),
+      line: getCssVariable('--text-muted', '#666666'),
+      accent: getCssVariable('--accent', '#d97757'),
+      muted: getCssVariable('--text-tertiary', '#999999'),
+      surface: getCssVariable('--bg-elevated', '#1a1a1a'),
+      border: getCssVariable('--border-color', '#2a2a2a'),
+    });
+  }
+
+  let selectedThemeKey = currentBeautifulTheme;
+  if (selectedThemeKey === rendererUtils.AUTO_ZINC_THEME_KEY) {
+    selectedThemeKey = rendererUtils.resolveAutoZincThemeKey(
+      Object.keys(themes),
+      document.body.classList.contains('light-mode')
+    );
+  }
+
+  if (themes[selectedThemeKey] && typeof themes[selectedThemeKey] === 'object') {
+    return themes[selectedThemeKey];
+  }
+  if (
+    themes[rendererUtils.DEFAULT_BEAUTIFUL_THEME] &&
+    typeof themes[rendererUtils.DEFAULT_BEAUTIFUL_THEME] === 'object'
+  ) {
+    return themes[rendererUtils.DEFAULT_BEAUTIFUL_THEME];
+  }
+  const firstTheme = Object.values(themes)[0];
+  if (firstTheme && typeof firstTheme === 'object') {
+    return firstTheme;
+  }
+  return rendererUtils.buildBeautifulTheme();
+}
+
+function configureNativeMermaidTheme() {
+  const isLightMode = document.body.classList.contains('light-mode');
+  mermaid.initialize({
+    startOnLoad: false,
+    theme: isLightMode ? 'default' : 'dark',
+    securityLevel: 'loose',
+    fontFamily: 'Inter, sans-serif',
+    flowchart: { useMaxWidth: false, fontSize: 16, padding: 15 },
+    sequence: { useMaxWidth: false, fontSize: 16, boxMargin: 10 },
+    gantt: { useMaxWidth: false, fontSize: 16 },
+    journey: { useMaxWidth: false, fontSize: 16 },
+    timeline: { useMaxWidth: false, fontSize: 16 },
+    class: { useMaxWidth: false, fontSize: 16 },
+    state: { useMaxWidth: false, fontSize: 16 },
+    er: { useMaxWidth: false, fontSize: 16 },
+    pie: { useMaxWidth: false, fontSize: 16 },
+    themeVariables: isLightMode ? {
+      darkMode: false,
+      background: '#ffffff',
+      primaryColor: '#c45e3e',
+      primaryTextColor: '#111111',
+      primaryBorderColor: '#c45e3e',
+      lineColor: '#888888',
+      secondaryColor: '#f5f5f5',
+      tertiaryColor: '#eeeeee',
+    } : {
+      darkMode: true,
+      background: '#161616',
+      primaryColor: '#d97757',
+      primaryTextColor: '#f0f0f0',
+      primaryBorderColor: '#d97757',
+      lineColor: '#666666',
+      secondaryColor: '#1a1a1a',
+      tertiaryColor: '#222222',
+    },
+  });
+}
+
+async function renderWithNativeMermaid() {
+  setRenderSurfaceMode(rendererUtils.RENDERERS.MERMAID);
+  configureNativeMermaidTheme();
+  const { svg } = await mermaid.render('mermaid-diagram', currentCode);
+  elements.mermaidOutput.innerHTML = svg;
+}
+
+function getEdgeStrokeColor(svgElement) {
+  const edgeElement = svgElement.querySelector(
+    'path[marker-end], path[marker-start], path[marker-mid], line[marker-end], polyline[marker-end], .edgePath .path, .edgePath path, path.flowchart-link'
+  );
+  if (!edgeElement) return '';
+
+  const computedStroke = window.getComputedStyle(edgeElement).stroke;
+  if (
+    computedStroke &&
+    computedStroke !== 'none' &&
+    computedStroke !== 'transparent' &&
+    computedStroke !== 'rgba(0, 0, 0, 0)'
+  ) {
+    return computedStroke;
+  }
+
+  const attributeStroke = edgeElement.getAttribute('stroke');
+  if (attributeStroke && attributeStroke !== 'none') {
+    return attributeStroke;
+  }
+
+  return '';
+}
+
+function parseMarkerId(value) {
+  if (!value) return '';
+  const match = String(value).match(/url\((['"]?)#([^)'"]+)\1\)/);
+  return match ? match[2] : '';
+}
+
+function syncBeautifulArrowheads(svgElement) {
+  const markerShapeSelector =
+    'path, polygon, polyline, line, circle, ellipse, rect';
+  const markerColorById = new Map();
+  const edgeElements = svgElement.querySelectorAll(
+    'path[marker-end], path[marker-start], path[marker-mid], line[marker-end], line[marker-start], line[marker-mid], polyline[marker-end], polyline[marker-start], polyline[marker-mid]'
+  );
+
+  edgeElements.forEach((edgeElement) => {
+    const computedStroke = window.getComputedStyle(edgeElement).stroke;
+    const strokeColor =
+      computedStroke &&
+      computedStroke !== 'none' &&
+      computedStroke !== 'transparent' &&
+      computedStroke !== 'rgba(0, 0, 0, 0)'
+        ? computedStroke
+        : edgeElement.getAttribute('stroke');
+
+    if (!strokeColor || strokeColor === 'none') return;
+
+    ['marker-start', 'marker-mid', 'marker-end'].forEach((attributeName) => {
+      const markerId = parseMarkerId(edgeElement.getAttribute(attributeName));
+      if (markerId && !markerColorById.has(markerId)) {
+        markerColorById.set(markerId, strokeColor);
+      }
+    });
+  });
+
+  if (!markerColorById.size) {
+    const fallbackStroke = getEdgeStrokeColor(svgElement);
+    if (!fallbackStroke) return;
+    svgElement.querySelectorAll('marker').forEach((marker) => {
+      marker.style.setProperty('color', fallbackStroke, 'important');
+      marker.setAttribute('color', fallbackStroke);
+      marker.querySelectorAll(markerShapeSelector).forEach((shape) => {
+        shape.style.setProperty('fill', fallbackStroke, 'important');
+        shape.style.setProperty('stroke', fallbackStroke, 'important');
+        shape.setAttribute('fill', fallbackStroke);
+        shape.setAttribute('stroke', fallbackStroke);
+      });
+    });
+    return;
+  }
+
+  markerColorById.forEach((strokeColor, markerId) => {
+    const marker = Array.from(svgElement.querySelectorAll('marker')).find(
+      (candidate) => candidate.id === markerId
+    );
+    if (!marker) return;
+    marker.style.setProperty('color', strokeColor, 'important');
+    marker.setAttribute('color', strokeColor);
+    marker.querySelectorAll(markerShapeSelector).forEach((shape) => {
+      shape.style.setProperty('fill', strokeColor, 'important');
+      shape.style.setProperty('stroke', strokeColor, 'important');
+      shape.setAttribute('fill', strokeColor);
+      shape.setAttribute('stroke', strokeColor);
+    });
+  });
+}
+
+async function renderWithBeautifulMermaid() {
+  setRenderSurfaceMode(rendererUtils.RENDERERS.BEAUTIFUL);
+  if (!isBeautifulMermaidAvailable()) {
+    throw new Error('beautiful-mermaid library is not available.');
+  }
+  const svg = await window.beautifulMermaid.renderMermaid(
+    currentCode,
+    getBeautifulThemeOptions()
+  );
+  elements.mermaidOutput.innerHTML = svg;
+  const renderedSvg = elements.mermaidOutput.querySelector('svg');
+  if (renderedSvg) {
+    syncBeautifulArrowheads(renderedSvg);
+  }
+}
+
 function debouncedRender() {
   if (renderTimeout) {
     clearTimeout(renderTimeout);
@@ -685,45 +1178,11 @@ async function renderDiagram() {
   }
 
   try {
-    // Update Mermaid theme based on current mode
-    const isLightMode = document.body.classList.contains('light-mode');
-    mermaid.initialize({
-      startOnLoad: false,
-      theme: isLightMode ? 'default' : 'dark',
-      securityLevel: 'loose',
-      fontFamily: 'Inter, sans-serif',
-      flowchart: { useMaxWidth: false, fontSize: 16, padding: 15 },
-      sequence: { useMaxWidth: false, fontSize: 16, boxMargin: 10 },
-      gantt: { useMaxWidth: false, fontSize: 16 },
-      journey: { useMaxWidth: false, fontSize: 16 },
-      timeline: { useMaxWidth: false, fontSize: 16 },
-      class: { useMaxWidth: false, fontSize: 16 },
-      state: { useMaxWidth: false, fontSize: 16 },
-      er: { useMaxWidth: false, fontSize: 16 },
-      pie: { useMaxWidth: false, fontSize: 16 },
-      themeVariables: isLightMode ? {
-        darkMode: false,
-        background: '#ffffff',
-        primaryColor: '#c45e3e',
-        primaryTextColor: '#111111',
-        primaryBorderColor: '#c45e3e',
-        lineColor: '#888888',
-        secondaryColor: '#f5f5f5',
-        tertiaryColor: '#eeeeee',
-      } : {
-        darkMode: true,
-        background: '#161616',
-        primaryColor: '#d97757',
-        primaryTextColor: '#f0f0f0',
-        primaryBorderColor: '#d97757',
-        lineColor: '#666666',
-        secondaryColor: '#1a1a1a',
-        tertiaryColor: '#222222',
-      },
-    });
-
-    const { svg } = await mermaid.render('mermaid-diagram', currentCode);
-    elements.mermaidOutput.innerHTML = svg;
+    if (currentRenderer === rendererUtils.RENDERERS.BEAUTIFUL) {
+      await renderWithBeautifulMermaid();
+    } else {
+      await renderWithNativeMermaid();
+    }
 
     // Center the diagram after rendering
     // If it's the first render or a reset, fit to view
@@ -735,7 +1194,10 @@ async function renderDiagram() {
       }
     }, 50);
   } catch (error) {
-    showToast('error', 'Syntax Error', error.message || 'Invalid Mermaid syntax');
+    const rendererLabel = currentRenderer === rendererUtils.RENDERERS.BEAUTIFUL
+      ? 'Beautiful Mermaid'
+      : 'Mermaid';
+    showToast('error', `${rendererLabel} Error`, error.message || 'Invalid Mermaid syntax');
   }
 }
 
@@ -745,7 +1207,29 @@ async function renderDiagram() {
 
 function loadSavedCode() {
   const savedCode = localStorage.getItem(CONFIG.STORAGE_KEY);
-  const code = savedCode || CONFIG.DEFAULT_CODE;
+  const legacyStyleLines = [
+    'style A fill:#1a1a1a,stroke:#d97757,color:#f0f0f0',
+    'style G fill:#1a1a1a,stroke:#22c55e,color:#f0f0f0',
+    'style B fill:#1a1a1a,stroke:#d97757,color:#f0f0f0',
+  ];
+  let code = savedCode || CONFIG.DEFAULT_CODE;
+  if (savedCode === CONFIG.LEGACY_DEFAULT_CODE) {
+    code = CONFIG.DEFAULT_CODE;
+    localStorage.setItem(CONFIG.STORAGE_KEY, code);
+  } else if (
+    savedCode &&
+    legacyStyleLines.every((line) => savedCode.includes(line))
+  ) {
+    const sanitized = savedCode
+      .split('\n')
+      .filter((line) => !legacyStyleLines.includes(line.trim()))
+      .join('\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trimEnd();
+
+    code = sanitized || CONFIG.DEFAULT_CODE;
+    localStorage.setItem(CONFIG.STORAGE_KEY, code);
+  }
   currentCode = code;
 
   if (editor) {
@@ -842,6 +1326,10 @@ const exportUtils = window.ExportUtils || {
   },
 };
 
+function getDiagramSvg() {
+  return elements.mermaidOutput.querySelector('svg');
+}
+
 function getExportBackgroundColor() {
   const bodyStyles = getComputedStyle(document.body);
   const outputStyles = getComputedStyle(elements.mermaidOutput);
@@ -853,28 +1341,129 @@ function getExportBackgroundColor() {
   });
 }
 
+function buildExportSvgMarkup(svg) {
+  const svgMarkup = new XMLSerializer().serializeToString(svg);
+  return exportUtils.buildStandaloneSvgMarkup(
+    svgMarkup,
+    'text { font-family: Inter, -apple-system, BlinkMacSystemFont, sans-serif; }'
+  );
+}
+
+function parseNumericDimension(value) {
+  if (value === undefined || value === null) return 0;
+  const match = String(value).match(/[\d.]+/);
+  return match ? Number(match[0]) : 0;
+}
+
+function getSvgDimensions(svg, image) {
+  const viewBox = svg.getAttribute('viewBox');
+  if (viewBox) {
+    const values = viewBox
+      .trim()
+      .split(/[\s,]+/)
+      .map((value) => Number(value));
+    if (
+      values.length === 4 &&
+      Number.isFinite(values[2]) &&
+      Number.isFinite(values[3]) &&
+      values[2] > 0 &&
+      values[3] > 0
+    ) {
+      return { width: values[2], height: values[3] };
+    }
+  }
+
+  const attributeWidth = parseNumericDimension(svg.getAttribute('width'));
+  const attributeHeight = parseNumericDimension(svg.getAttribute('height'));
+  if (attributeWidth > 0 && attributeHeight > 0) {
+    return { width: attributeWidth, height: attributeHeight };
+  }
+
+  const rect = svg.getBoundingClientRect();
+  if (rect.width > 0 && rect.height > 0) {
+    return { width: rect.width, height: rect.height };
+  }
+
+  if (image.naturalWidth > 0 && image.naturalHeight > 0) {
+    return { width: image.naturalWidth, height: image.naturalHeight };
+  }
+
+  return { width: 1200, height: 800 };
+}
+
+function loadImage(url) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error('Failed to render SVG for export'));
+    image.src = url;
+  });
+}
+
+async function renderDiagramCanvas(scale = 2, padding = 20) {
+  const svg = getDiagramSvg();
+  if (!svg) {
+    throw new Error('No diagram to export');
+  }
+
+  const svgData = buildExportSvgMarkup(svg);
+  const blob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+
+  try {
+    const image = await loadImage(url);
+    const { width, height } = getSvgDimensions(svg, image);
+    const canvas = document.createElement('canvas');
+
+    canvas.width = Math.max(1, Math.round((width + padding * 2) * scale));
+    canvas.height = Math.max(1, Math.round((height + padding * 2) * scale));
+
+    const context = canvas.getContext('2d');
+    if (!context) {
+      throw new Error('Could not create drawing context for export');
+    }
+    context.fillStyle = getExportBackgroundColor();
+    context.fillRect(0, 0, canvas.width, canvas.height);
+
+    const imageWidth = width * scale;
+    const imageHeight = height * scale;
+    context.drawImage(
+      image,
+      Math.round(padding * scale),
+      Math.round(padding * scale),
+      Math.round(imageWidth),
+      Math.round(imageHeight)
+    );
+
+    return canvas;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+function downloadBlob(blob, filename) {
+  const link = document.createElement('a');
+  link.download = filename;
+  link.href = URL.createObjectURL(blob);
+  link.click();
+  URL.revokeObjectURL(link.href);
+}
+
 async function exportPng() {
-  const svg = elements.mermaidOutput.querySelector('svg');
+  const svg = getDiagramSvg();
   if (!svg) {
     showToast('error', 'Export Failed', 'No diagram to export');
     return;
   }
 
   try {
-    const backgroundColor = getExportBackgroundColor();
+    const canvas = await renderDiagramCanvas(2, 20);
 
-    // Create a canvas with 2x scale for retina
-    const canvas = await html2canvas(elements.mermaidOutput, {
-      scale: 2,
-      backgroundColor,
-      logging: false,
-    });
-
-    // Download
-    const link = document.createElement('a');
-    link.download = 'mermaid-diagram.png';
-    link.href = canvas.toDataURL('image/png');
-    link.click();
+    const blob = await new Promise((resolve) =>
+      canvas.toBlob(resolve, 'image/png')
+    );
+    if (!blob) throw new Error('Failed to encode PNG');
+    downloadBlob(blob, 'mermaid-diagram.png');
 
     showToast('success', 'Export Complete', 'PNG downloaded at 2x resolution');
   } catch (error) {
@@ -883,25 +1472,16 @@ async function exportPng() {
 }
 
 function exportSvg() {
-  const svg = elements.mermaidOutput.querySelector('svg');
+  const svg = getDiagramSvg();
   if (!svg) {
     showToast('error', 'Export Failed', 'No diagram to export');
     return;
   }
 
   try {
-    const svgMarkup = new XMLSerializer().serializeToString(svg);
-    const svgData = exportUtils.buildStandaloneSvgMarkup(
-      svgMarkup,
-      'text { font-family: Inter, -apple-system, BlinkMacSystemFont, sans-serif; }'
-    );
+    const svgData = buildExportSvgMarkup(svg);
     const blob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
-
-    const link = document.createElement('a');
-    link.download = 'mermaid-diagram.svg';
-    link.href = URL.createObjectURL(blob);
-    link.click();
-    URL.revokeObjectURL(link.href);
+    downloadBlob(blob, 'mermaid-diagram.svg');
 
     showToast('success', 'Export Complete', 'SVG downloaded successfully');
   } catch (error) {
@@ -918,7 +1498,7 @@ function hidePdfModal() {
 }
 
 async function exportPdf(pageSize = 'a4') {
-  const svg = elements.mermaidOutput.querySelector('svg');
+  const svg = getDiagramSvg();
   if (!svg) {
     showToast('error', 'Export Failed', 'No diagram to export');
     return;
@@ -926,7 +1506,6 @@ async function exportPdf(pageSize = 'a4') {
 
   try {
     const { jsPDF } = window.jspdf;
-    const backgroundColor = getExportBackgroundColor();
 
     // Page dimensions
     const sizes = {
@@ -942,12 +1521,7 @@ async function exportPdf(pageSize = 'a4') {
       format: pageSize,
     });
 
-    // Convert SVG to image
-    const canvas = await html2canvas(elements.mermaidOutput, {
-      scale: 2,
-      backgroundColor,
-      logging: false,
-    });
+    const canvas = await renderDiagramCanvas(2, 20);
 
     const imgData = canvas.toDataURL('image/png');
 
@@ -975,6 +1549,99 @@ async function exportPdf(pageSize = 'a4') {
   }
 }
 
+function showAsciiModal() {
+  if (!currentCode.trim()) {
+    showToast('error', 'Export Failed', 'No code to convert to ASCII');
+    return;
+  }
+  elements.asciiModal.classList.add('active');
+  refreshAsciiPreview();
+}
+
+function hideAsciiModal() {
+  elements.asciiModal.classList.remove('active');
+}
+
+async function renderAsciiPreview() {
+  if (!isBeautifulMermaidAvailable()) {
+    throw new Error('beautiful-mermaid library is not available.');
+  }
+  const useAscii = elements.asciiModeAscii.checked;
+  const output = await Promise.resolve(
+    window.beautifulMermaid.renderMermaidAscii(currentCode, { useAscii })
+  );
+  return String(output || '');
+}
+
+async function refreshAsciiPreview() {
+  if (!elements.asciiModal.classList.contains('active')) return;
+  elements.asciiPreview.textContent = 'Rendering ASCII preview...';
+
+  try {
+    latestAscii = await renderAsciiPreview();
+    if (!latestAscii) {
+      elements.asciiPreview.textContent = '[empty ASCII output]';
+      return;
+    }
+    elements.asciiPreview.textContent = latestAscii;
+  } catch (error) {
+    latestAscii = '';
+    elements.asciiPreview.textContent = `Failed to render ASCII preview:\n${error.message}`;
+    showToast('error', 'ASCII Render Failed', error.message);
+  }
+}
+
+async function copyTextToClipboard(text) {
+  if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.style.position = 'fixed';
+  textarea.style.top = '-1000px';
+  document.body.appendChild(textarea);
+  textarea.select();
+  document.execCommand('copy');
+  document.body.removeChild(textarea);
+}
+
+async function copyAsciiPreview() {
+  if (!latestAscii) {
+    await refreshAsciiPreview();
+  }
+  if (!latestAscii) {
+    showToast('error', 'Copy Failed', 'No ASCII output available to copy');
+    return;
+  }
+
+  try {
+    await copyTextToClipboard(latestAscii);
+    showToast('success', 'Copied', 'ASCII output copied to clipboard');
+  } catch (error) {
+    showToast('error', 'Copy Failed', error.message);
+  }
+}
+
+async function downloadAsciiPreview() {
+  if (!latestAscii) {
+    await refreshAsciiPreview();
+  }
+  if (!latestAscii) {
+    showToast('error', 'Export Failed', 'No ASCII output available to export');
+    return;
+  }
+
+  try {
+    const blob = new Blob([latestAscii], { type: 'text/plain;charset=utf-8' });
+    downloadBlob(blob, 'mermaid-diagram-ascii.txt');
+    showToast('success', 'Export Complete', 'ASCII output exported');
+  } catch (error) {
+    showToast('error', 'Export Failed', error.message);
+  }
+}
+
 function exportCode() {
   if (!currentCode.trim()) {
     showToast('error', 'Export Failed', 'No code to export');
@@ -983,11 +1650,7 @@ function exportCode() {
 
   try {
     const blob = new Blob([currentCode], { type: 'text/plain;charset=utf-8' });
-    const link = document.createElement('a');
-    link.download = 'diagram.mmd';
-    link.href = URL.createObjectURL(blob);
-    link.click();
-    URL.revokeObjectURL(link.href);
+    downloadBlob(blob, 'diagram.mmd');
 
     showToast('success', 'Export Complete', 'Mermaid code saved as .mmd file');
   } catch (error) {
